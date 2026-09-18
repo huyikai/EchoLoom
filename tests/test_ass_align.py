@@ -92,7 +92,8 @@ def test_align_exact_match():
     assert l1["start"] == pytest.approx(10.0, abs=0.05)
     assert l1["chars"][0]["ch"] == "让"
     assert l1["chars"][0]["start"] == pytest.approx(10.0, abs=0.05)
-    assert l2["start"] == pytest.approx(12.1, abs=0.35)  # 「吹散」重复词落到第二处
+    # 游标顺序匹配：ASR 只有一处「吹散」被第一行消费，第二行从「也不」起拍
+    assert l2["start"] == pytest.approx(13.0, abs=0.3)
     assert l2["end"] <= 20.0
     # 字时间单调
     for line in out:
@@ -117,6 +118,28 @@ def test_align_total_mismatch_falls_back_proportional():
     assert len(out) == 2
     assert out[0]["start"] == pytest.approx(0.0, abs=0.5)
     assert out[-1]["end"] == pytest.approx(24.0, abs=0.5)
+
+
+def test_align_repeated_lines_are_monotonic():
+    lines = ["让风把名字吹散", "也不回头", "让风把名字吹散", "也不回头"]
+    words = [
+        {"word": "让", "start": 10.0, "end": 10.3}, {"word": "风", "start": 10.3, "end": 10.6},
+        {"word": "把名字", "start": 10.6, "end": 11.2}, {"word": "吹散", "start": 11.2, "end": 11.9},
+        {"word": "也不回头", "start": 11.9, "end": 12.8},
+        {"word": "让", "start": 30.0, "end": 30.3}, {"word": "风", "start": 30.3, "end": 30.6},
+        {"word": "把名字", "start": 30.6, "end": 31.2}, {"word": "吹散", "start": 31.2, "end": 31.9},
+        {"word": "也不回头", "start": 31.9, "end": 32.8},
+    ]
+    out = align_lines(lines, words, total_sec=40.0)
+    assert len(out) == 4
+    starts = [l["start"] for l in out]
+    assert starts == sorted(starts), starts
+    # 两遍副歌应各归各的出现位置（~10s 和 ~30s），不能全挤在第一处
+    assert out[0]["start"] < 15 < out[2]["start"]
+    assert out[2]["start"] > 25
+    # 每行有最小可读时长
+    for l in out:
+        assert l["end"] - l["start"] >= 0.85
 
 
 def test_align_skips_empty_lines():

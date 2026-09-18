@@ -91,7 +91,7 @@ def build_ass(style: AssStyle, timed_lines: list[dict[str, Any]], *,
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"{style_line(style)},1,0,0,0,100,100,0,0,1,{style.outline},{style.shadow},2,60,60,50,1\n\n"
+        f"{style_line(style)}\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )

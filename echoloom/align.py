@@ -10,7 +10,6 @@ import difflib
 import re
 from typing import Any
 
-SimilarityFloor = 0.45
 _PUNCT = re.compile(r"""[，。！？、；：""''（）\s,.!?;:()'"—…·-]""")
 
 
@@ -42,7 +41,11 @@ def _time_at(offset: int, text: str, spans: list[tuple[int, int, float, float]])
 
 def align_lines(lines: list[str], asr_words: list[dict[str, Any]], *,
                 total_sec: float | None = None) -> list[dict[str, Any]]:
-    """歌词行列表 → timed_lines。每行 {start, end, text, chars:[{ch,start,end}]}。"""
+    """歌词行列表 → timed_lines。每行 {start, end, text, chars:[{ch,start,end}]}。
+
+    顺序游标匹配：逐行在 ASR 字符流的剩余区间里找最佳匹配块（保证时间轴单调，
+    重复的副歌各归各的出现位置），匹配不上的行走插值兜底。
+    """
     lyric_lines: list[list[str]] = []
     lyric_stream = ""
     line_spans: list[tuple[int, int]] = []
@@ -55,21 +58,39 @@ def align_lines(lines: list[str], asr_words: list[dict[str, Any]], *,
     asr_text, asr_spans = words_to_stream(asr_words)
     a = "".join(_norm_char(c) for c in lyric_stream)
     b = "".join(_norm_char(c) for c in asr_text)
-    ratio = difflib.SequenceMatcher(None, a, b).ratio() if a and b else 0.0
 
     lyric_time = [-1.0] * len(lyric_stream)
 
-    if ratio >= SimilarityFloor:
+    if a and b:
+        cursor = 0
         sm = difflib.SequenceMatcher(None, a, b)
-        for mb in sm.get_matching_blocks():
-            for k in range(mb.size):
-                t = _time_at(mb.b + k, asr_text, asr_spans)
-                if t >= 0:
-                    lyric_time[mb.a + k] = t
+        # 全局相似度过低时仍尝试逐行匹配（逐行容错性更好）
+        for (s0, s1) in line_spans:
+            seg = a[s0:s1]
+            if not seg:
+                continue
+            best_pos, best_ratio = -1, 0.0
+            span = max(len(seg) // 2, 4)
+            start = cursor
+            while start <= len(b):
+                window = b[start : start + len(seg) + span]
+                if not window:
+                    break
+                r = difflib.SequenceMatcher(None, seg, window).ratio()
+                if r > best_ratio:
+                    best_ratio, best_pos = r, start
+                if r > 0.92:
+                    break
+                start += max(1, len(seg) // 4)
+            if best_pos >= 0 and best_ratio >= 0.55:
+                for k in range(len(seg)):
+                    t = _time_at(best_pos + k, asr_text, asr_spans)
+                    if t >= 0:
+                        lyric_time[s0 + k] = t
+                cursor = best_pos + len(seg)  # 单调前进：重复段落下次从其后找
 
     _interpolate(lyric_time)
-    if total_sec and lyric_time and lyric_time[-1] <= 0:
-        # 完全无锚点：按比例铺满
+    if total_sec and (not lyric_time or max(lyric_time) <= 0):
         return _proportional(lines, total_sec)
 
     return _assemble(lines, lyric_lines, line_spans, lyric_time, asr_spans, asr_text, total_sec)
@@ -105,9 +126,9 @@ def _assemble(lines: list[str], lyric_lines: list[list[str]], line_spans: list[t
         char_times = lyric_time[s0:s1]
         start = char_times[0]
         end_guess = char_times[-1]
-        # 行尾：用最后一个字符时长估计
+        # 行尾：用最后一个字符时长估计；并保证最短可读时长
         tail = max(0.35, (end_guess - start) / len(char_times)) if len(char_times) > 1 else 0.6
-        end = min(max_t, end_guess + tail)
+        end = max(start + 0.9, min(max_t, end_guess + tail))
         # 行间防重叠由时间单调性保证；chars 时间也做一次夹逼
         timed_chars = []
         for ch, t in zip([c for c in text if not _PUNCT.match(c)], char_times):
@@ -129,6 +150,13 @@ def _assemble(lines: list[str], lyric_lines: list[list[str]], line_spans: list[t
                 tc["end"] = min(tc["end"], prev["end"])
             for tc in cur["chars"]:
                 tc["start"] = max(tc["start"], cur["start"])
+    # 最短可读时长（最终钳制，允许与下一行首轻微重叠——karaoke 有淡入淡出）
+    for i, line in enumerate(out):
+        if line["end"] - line["start"] < 0.85:
+            new_end = line["start"] + 0.85
+            if i + 1 < len(out) and new_end > out[i + 1]["start"]:
+                new_end = out[i + 1]["start"]
+            line["end"] = round(max(line["end"], new_end), 3)
     return out
 
 
