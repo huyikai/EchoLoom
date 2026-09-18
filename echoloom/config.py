@@ -14,7 +14,7 @@ class Settings(BaseSettings):
         env_file=ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    zhipu_api_key: str = ""
+    zhipuai_api_key: str = ""
     llm_model: str = "glm-4.6"
 
     comfyui_url: str = "http://127.0.0.1:8188"

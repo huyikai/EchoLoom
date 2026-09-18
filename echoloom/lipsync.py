@@ -26,8 +26,8 @@ def lip_sync_cmd(source_audio: Path, target_video: Path, dest: Path, *,
         str(py), str(ff_root / "facefusion.py"), "headless-run",
         "--processors", "lip_syncer",
         "--lip-syncer-model", model,
-        "--source-paths", str(source_audio),
-        "--target-paths", str(target_video),
+        "--source-paths", str(source_audio),   # 本 fork: source 复数 / target、output 单数
+        "--target-path", str(target_video),
         "--output-path", str(dest),
         "--execution-providers", "cuda",
         "--log-level", "warn",
@@ -46,7 +46,8 @@ def run_lip_sync(source_audio: Path, target_video: Path, dest: Path, *,
                  timeout: float = 3600.0) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     cmd, env = lip_sync_cmd(source_audio, target_video, dest, settings=settings, model=model)
-    p = subprocess.run(cmd, env=env, capture_output=True, text=True,
+    p = subprocess.run(cmd, env=env, cwd=str(settings.facefusion_root),  # FF 用相对路径解析 processors/模型
+                       capture_output=True, text=True,
                        encoding="utf-8", errors="replace", timeout=timeout)
     if p.returncode != 0 or not dest.exists():
         raise FfmpegError(
