@@ -67,12 +67,13 @@ def ass_time(sec: float) -> str:
 
 
 def style_line(style: AssStyle) -> str:
+    """完整 23 字段 ASS V4+ Style 行（字段顺序见 build_ass 的 Format 行，不可乱序）。"""
     return (
         f"Style: {STYLE_NAME},{style.font_name},{style.font_size},"
         f"{ass_color(style.primary)},{ass_color(style.secondary)},"
         f"{ass_color(style.outline_color)},{ass_color('#000000', 0x80)},"
-        f"{style.bold:d},{style.alignment},{style.margin_l},{style.margin_r},{style.margin_v},"
-        f"-1,0,0,0,0,0"
+        f"{style.bold:d},0,0,0,100,100,0,0,1,{style.outline:g},{style.shadow:g},"
+        f"{style.alignment},{style.margin_l},{style.margin_r},{style.margin_v},1"
     )
 
 

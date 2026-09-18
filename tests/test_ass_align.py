@@ -25,7 +25,15 @@ def test_style_line_contains_fields():
     style = AssStyle()
     line = style_line(style)
     assert line.startswith("Style: EchoLoom,Microsoft YaHei,60,")
-    assert len(line.split(",")) == 18  # Style 名 + 23 字段格式中我们输出的 18 项
+    fields = line.split(",")[1:]  # 去掉 "Style: EchoLoom" 名字段，剩余 22 个
+    # Fontname..Encoding 共 22 个
+    assert len(fields) == 22
+    assert fields[7] == "1"          # Bold
+    assert fields[8] == "0"          # Italic
+    assert fields[11] == "100"       # ScaleX
+    assert fields[16] == "2"         # Outline 宽度
+    assert fields[18] == "2"         # Alignment 底部居中
+    assert fields[19:] == ["60", "60", "50", "1"]
     # primary #00E5FF → BGR FFE500；secondary #F2F2F2 → F2F2F2
     assert "&H00FFE500" in line
     assert "&H00F2F2F2" in line
