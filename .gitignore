@@ -20,3 +20,6 @@ output/
 # logs
 *.log
 logs/
+
+# session artifacts
+.zcode/
