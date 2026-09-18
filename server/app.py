@@ -328,10 +328,12 @@ def edit_portrait(pid: str, req: dict[str, Any]) -> dict:
     if not files:
         raise HTTPException(400, "images 不能为空")
     known = {v for gs in p.gates["portrait"].versions for v in (gs.payload or [])}
-    unknown = [f for f in files if f not in known]
+    # 允许传 URL 或文件名，统一按 basename 归一
+    normalized = [Path(f).name for f in files]
+    unknown = [f for f in normalized if f not in known]
     if unknown:
         raise HTTPException(400, f"未知文件: {unknown}")
-    v = p.edit("portrait", files, note="picked")
+    v = p.edit("portrait", normalized, note="picked")
     store.save(p)
     return project_view(p)
 

@@ -152,7 +152,9 @@ export function PortraitPanel({ proj, act }: { proj: Project; act: Act }) {
                 const imgs = v.images ?? [];
                 const chosen = pick ?? imgs[0];
                 act(async () => {
-                  await api.pickPortrait(proj.id, [chosen, ...imgs.filter((x) => x !== chosen)]);
+                  const names = [chosen, ...imgs.filter((x) => x !== chosen)]
+                    .map((u) => u.split("/").pop() ?? u);
+                  await api.pickPortrait(proj.id, names);
                   return api.approve(proj.id, "portrait");
                 });
               }}>✓ 确认肖像</button>
