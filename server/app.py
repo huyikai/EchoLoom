@@ -86,6 +86,8 @@ class Store:
 
         def wrapped():
             try:
+                p.error = ""
+                self.save(p)
                 fn()
                 p.error = ""
                 self.save(p)
@@ -313,6 +315,23 @@ def edit_storyboard(pid: str, req: dict[str, Any]) -> dict:
     (store.dir(pid) / "storyboard").mkdir(exist_ok=True)
     (store.dir(pid) / "storyboard" / f"v{v.id}.json").write_text(
         json.dumps(req, ensure_ascii=False, indent=1), encoding="utf-8")
+    store.save(p)
+    return project_view(p)
+
+
+@app.put("/api/projects/{pid}/gates/portrait")
+def edit_portrait(pid: str, req: dict[str, Any]) -> dict:
+    """重排/编辑肖像候选：payload 为文件名列表，第一张将作为歌手形象。"""
+    p = store.get(pid)
+    _require_gate_editable(p, "portrait")
+    files = req.get("images") or []
+    if not files:
+        raise HTTPException(400, "images 不能为空")
+    known = {v for gs in p.gates["portrait"].versions for v in (gs.payload or [])}
+    unknown = [f for f in files if f not in known]
+    if unknown:
+        raise HTTPException(400, f"未知文件: {unknown}")
+    v = p.edit("portrait", files, note="picked")
     store.save(p)
     return project_view(p)
 

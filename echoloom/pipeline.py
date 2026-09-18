@@ -170,14 +170,14 @@ class Pipeline:
         durs = [float(s["duration"]) * scale for s in shots]
         self.progress("compose", f"时间轴: {len(shots)} 镜 × 缩放 {scale:.3f} = {song_dur:.1f}s", 0.34)
 
-        # 2) 关键帧：scene 用 Z-Image，singer 用已选肖像
+        # 2) 关键帧：scene 用 Z-Image，singer 用已选肖像（裁成横版避免 H3 压扁）
         kf_dir = self._dir(project_dir, "shots", "keyframes")
         portraits = self._dir(project_dir, "portraits")
         chosen_portrait = self._chosen_portrait(state, portraits)
         keyframes: list[Path] = []
         for i, shot in enumerate(shots):
             if shot["type"] == "singer":
-                keyframes.append(chosen_portrait)
+                keyframes.append(self._landscape(chosen_portrait, kf_dir / f"portrait_land_{i + 1:02d}.png"))
                 continue
             prompt = (
                 f"{shot['prompt']}. Consistent character: {sb['singer_desc']}. "
@@ -262,6 +262,15 @@ class Pipeline:
         return final
 
     # ---- 内部 -----------------------------------------------------------------
+    def _landscape(self, src: Path, dest: Path) -> Path:
+        """任意比例图片 → 等比放大 + 居中裁切到目标横版分辨率。"""
+        if dest.exists():
+            return dest
+        run([self.s.ffmpeg_bin, "-y", "-v", "error", "-i", str(src), "-frames:v", "1",
+             "-vf", (f"scale={self.s.width}:{self.s.height}:force_original_aspect_ratio=increase,"
+                     f"crop={self.s.width}:{self.s.height}"), str(dest)])
+        return dest
+
     def _chosen_portrait(self, state: ProjectState, portraits_dir: Path) -> Path:
         payload = state.gates["portrait"].approved_payload or []
         # UI 允许从候选中挑一张：payload 可以是 ["candidate_1.png"] 或 ["candidate_2.png"]

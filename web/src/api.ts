@@ -44,6 +44,12 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     }).then((r) => j<Project>(r)),
+  pickPortrait: (id: string, images: string[]) =>
+    fetch(`/api/projects/${id}/gates/portrait`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ images }),
+    }).then((r) => j<Project>(r)),
   putStyle: (id: string, style: AssStyle) =>
     fetch(`/api/projects/${id}/style`, {
       method: "PUT",

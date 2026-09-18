@@ -133,7 +133,7 @@ export function PortraitPanel({ proj, act }: { proj: Project; act: Act }) {
     <div className="panel" id="gate-portrait">
       <h3>🧑‍🎤 歌手肖像 {isApproved && <span className="badge ok">已确认</span>}</h3>
       <p className="sub">点击选择要用作歌手形象的候选（确认后所有歌手镜头使用该形象）</p>
-      {v?.images?.length ? (
+      {v?.images && v.images.length ? (
         <>
           <div className="thumbs">
             {v.images.map((src, i) => (
@@ -148,7 +148,14 @@ export function PortraitPanel({ proj, act }: { proj: Project; act: Act }) {
             <div className="spacer" />
             <button className="btn" onClick={() => act(() => api.regenerate(proj.id, "portrait"))}>↻ 换一批</button>
             <button className="btn ok" disabled={isApproved}
-              onClick={() => act(() => api.approve(proj.id, "portrait"))}>✓ 确认肖像</button>
+              onClick={() => {
+                const imgs = v.images ?? [];
+                const chosen = pick ?? imgs[0];
+                act(async () => {
+                  await api.pickPortrait(proj.id, [chosen, ...imgs.filter((x) => x !== chosen)]);
+                  return api.approve(proj.id, "portrait");
+                });
+              }}>✓ 确认肖像</button>
           </div>
         </>
       ) : <div className="empty">确认分镜后自动生成肖像候选…</div>}
