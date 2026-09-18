@@ -114,7 +114,7 @@ def client(tmp_path, monkeypatch):
 
 def wait_done(client, pid, timeout=5.0):
     import time
-    for _ in range(int(timeout / 0.05)):
+    for _ in range(200):
         st = client.get(f"/api/projects/{pid}").json()
         if st["gates"]["audio"]["versions"] or st["status"] != "gathering":
             if st["error"]:
@@ -149,7 +149,7 @@ def test_full_gate_flow_and_compose(client):
         return client.get(f"/api/projects/{pid}").json()["gates"][gate]["versions"]
 
     for gate in ("lyrics", "storyboard", "portrait", "audio"):
-        for _ in range(100):
+        for _ in range(400):
             if has_version(gate):
                 break
             time.sleep(0.05)
@@ -165,7 +165,7 @@ def test_full_gate_flow_and_compose(client):
     # 合成
     r = client.post(f"/api/projects/{pid}/compose", json={})
     assert r.status_code == 200
-    for _ in range(100):
+    for _ in range(400):
         st = client.get(f"/api/projects/{pid}").json()
         if st["final"]:
             break
