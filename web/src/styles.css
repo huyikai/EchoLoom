@@ -29,7 +29,10 @@
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(1100px 520px at 78% -8%, rgba(233, 180, 76, 0.07), transparent 62%),
+    radial-gradient(900px 480px at -6% 4%, rgba(127, 180, 232, 0.05), transparent 60%),
+    var(--bg);
   color: var(--text);
   font-family: var(--font);
   font-size: 14px;
@@ -124,6 +127,15 @@ textarea.inp { resize: vertical; min-height: 64px; }
   border: 1px solid var(--line-strong); border-radius: 999px; padding: 6px 14px;
   color: var(--muted); font-size: 12.5px;
 }
+.eq { display: flex; align-items: flex-end; gap: 5px; height: 56px; margin: 46px 0 0; }
+.eq i {
+  width: 6px; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, var(--accent), rgba(233,180,76,.12));
+  animation: eqb 1.6s ease-in-out infinite;
+}
+.eq i:nth-child(2n) { animation-delay: .22s; opacity: .75; }
+.eq i:nth-child(3n) { animation-delay: .5s; opacity: .55; }
+.eq i:nth-child(5n) { animation-delay: .82s; }
+@keyframes eqb { 0%, 100% { height: 14%; } 50% { height: 92%; } }
 
 .phead { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
 .phead h2 { margin: 0; font-size: 24px; }
@@ -143,6 +155,8 @@ textarea.inp { resize: vertical; min-height: 64px; }
   font-size: 13px; font-family: var(--font);
 }
 .step.active { border-color: var(--accent); color: var(--text); background: var(--accent-soft); }
+.step.working { border-color: var(--info); color: var(--text); background: var(--info-soft); }
+.step.working .n { color: var(--info); animation: pulse 1.2s infinite; }
 .step .n {
   width: 18px; height: 18px; border-radius: 50%; background: var(--bg-elev2); color: var(--dim);
   display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-family: var(--mono);

@@ -153,6 +153,9 @@ export default function App() {
                 <span>① 歌词</span><span>② 分镜脚本</span><span>③ 歌手肖像</span>
                 <span>④ 整曲试听</span><span>⑤ 一键合成</span>
               </div>
+              <div className="eq" aria-hidden>
+                {Array.from({ length: 28 }, (_, i) => <i key={i} />)}
+              </div>
             </div>
           ) : (
             <>
@@ -174,8 +177,9 @@ export default function App() {
               <div className="stepper">
                 {GATES.map((g, i) => {
                   const gv = cur.gates[g.key];
-                  const cls = gv.approved_version != null ? "approved" :
-                    gv.versions.length ? "" : "";
+                  const approvedIdx = GATES.findIndex((x) => cur.gates[x.key].approved_version == null);
+                  const cls = gv.approved_version != null ? "approved"
+                    : (i === approvedIdx && (cur.status === "composing" || events.length > 0)) ? "working" : "";
                   return (
                     <button key={g.key} className={`step ${cls}`}
                       onClick={() => document.getElementById(`gate-${g.key}`)?.scrollIntoView({ behavior: "smooth" })}>

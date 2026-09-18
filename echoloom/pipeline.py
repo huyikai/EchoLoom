@@ -145,7 +145,7 @@ class Pipeline:
         vdir = self._dir(project_dir, "audio")
         dest = vdir / f"song_v{len(state.gates['audio'].versions) + 1}.flac"
         self.comfy.fetch(outs[0], dest)
-        dur = probe_sec(self.s.ffmpeg_bin, dest) if self.s.ffmpeg_bin else 0.0
+        dur = probe_sec(self.s.ffprobe_bin, dest)
         version = state.submit("audio", dest.name, note=f"{dur:.1f}s")
         self.progress("audio", f"整曲 v{version.id} 完成（实测 {dur:.1f}s）", 0.32)
         return dest
@@ -161,7 +161,7 @@ class Pipeline:
         state.status = ProjectStatus.composing
 
         shots: list[dict[str, Any]] = sb["shots"]
-        song_dur = probe_sec(self.s.ffmpeg_bin, song)
+        song_dur = probe_sec(self.s.ffprobe_bin, song)
         xfade_t = 0.5
 
         # 1) 时间轴：分镜总长 → 等比缩放到实际歌曲时长

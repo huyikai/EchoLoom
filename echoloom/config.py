@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     def output_root(self) -> Path:
         return ROOT / "output"
 
+    @property
+    def ffprobe_bin(self) -> str:
+        """与 ffmpeg_bin 同目录的 ffprobe；裸名时用 PATH 里的 ffprobe。"""
+        p = Path(self.ffmpeg_bin)
+        if p.parent == Path("."):
+            return "ffprobe"
+        return str(p.with_name("ffprobe.exe" if p.suffix == ".exe" else "ffprobe"))
+
 
 @lru_cache
 def get_settings() -> Settings:
