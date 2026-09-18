@@ -35,6 +35,7 @@ server = [
 facefusion = [
   "gradio==5.50.0",
   "numpy==2.2.1",
+  "onnx>=1.16",
   "onnxruntime-gpu>=1.26",
   "opencv-python==4.13.0.92",
   "tqdm>=4.67",
