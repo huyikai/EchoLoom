@@ -1,0 +1,22 @@
+# secrets & local config
+.env
+config/local.yaml
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# node
+web/node_modules/
+web/dist/
+
+# 产物
+output/
+!output/.gitkeep
+
+# logs
+*.log
+logs/
