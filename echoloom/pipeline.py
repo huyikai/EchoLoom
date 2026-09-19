@@ -168,6 +168,7 @@ class Pipeline:
         sb_total = sum(float(s["duration"]) for s in shots)
         scale = song_dur / sb_total
         durs = [float(s["duration"]) * scale for s in shots]
+        padded = [d + xfade_t for d in durs[:-1]] + [durs[-1]]  # xfade 补偿后的素材时长
         self.progress("compose", f"时间轴: {len(shots)} 镜 × 缩放 {scale:.3f} = {song_dur:.1f}s", 0.34)
 
         # 2) 关键帧：scene 用 Z-Image，singer 用已选肖像（裁成横版避免 H3 压扁）
@@ -214,14 +215,25 @@ class Pipeline:
         master, _ = master_audio(self.s.ffmpeg_bin, song,
                                  self._dir(project_dir, "final") / "master.flac")
 
-        # 5) 歌手镜头对口型（用 vocals 分轨）
+        # 5) 歌手镜头对口型（用 vocals 分轨；按镜头在成片时间轴上的位置切片，
+        #    FaceFusion 按帧号从源音频开头取帧，传整条轨会把所有镜头对到 0 秒起）
         lipsync_dir = self._dir(project_dir, "shots", "lipsync")
+        slice_dir = self._dir(project_dir, "shots", "lipsync_audio")
+        clip_offsets = [0.0]
+        for d in padded[:-1]:
+            clip_offsets.append(clip_offsets[-1] + d - xfade_t)
         for i, (shot, clip) in enumerate(zip(shots, clips)):
             if shot["type"] != "singer":
                 continue
             from .lipsync import run_lip_sync
+            a0 = max(0.0, clip_offsets[i] - 0.25)
+            a1 = min(song_dur, clip_offsets[i] + durs[i] + 0.25)
+            audio_slice = slice_dir / f"shot_{i + 1:02d}.wav"
+            run([self.s.ffmpeg_bin, "-y", "-v", "error", "-i", str(stems["vocals"]),
+                 "-ss", f"{a0:.3f}", "-to", f"{a1:.3f}", "-ac", "1", "-ar", "16000",
+                 str(audio_slice)])
             out = lipsync_dir / f"shot_{i + 1:02d}.mp4"
-            run_lip_sync(stems["vocals"], clip, out, settings=self.s)
+            run_lip_sync(audio_slice, clip, out, settings=self.s)
             clips[i] = out
             self.progress("compose", f"对口型 {i + 1} 完成", 0.80)
 
@@ -245,7 +257,6 @@ class Pipeline:
         # 7) 镜头装配 + xfade + 烧字
         self.progress("compose", "装配时间线…", 0.88)
         workdir = self._dir(project_dir, "final", "segs")
-        padded = [d + xfade_t for d in durs[:-1]] + [durs[-1]]
         segs: list[Path] = []
         for i, (clip, d) in enumerate(zip(clips, padded)):
             segs.append(build_clip(clip, workdir / f"seg_{i:02d}.mp4", dur=d,

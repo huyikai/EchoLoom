@@ -68,6 +68,50 @@ def zimage_workflow(prompt: str, *, negative: str = "", width: int = 1344, heigh
     }
 
 
+def h3_r2v_workflow(image_name: str, audio_name: str, motion_prompt: str, *, seed: int = 0,
+                    frames: int = 120, width: int = 1344, height: int = 768,
+                    prefix: str = "echoloom/h3r2v") -> dict:
+    """Ref2VA 声画同步：参考图(歌手形象) + 真实音频段 → 跟唱视频（studebaker 已验证）。
+
+    帧数约束与 i2v 不同：本机验证为 17 的倍数（gen_r2v.py frames_for）。
+    """
+    if frames % 17:
+        frames += 17 - frames % 17
+    return {
+        "1": {"class_type": "UNETLoader",
+              "inputs": {"unet_name": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+                         "weight_dtype": "default"}},
+        "2": {"class_type": "CLIPLoader",
+              "inputs": {"clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+                         "type": "minimax", "device": "default"}},
+        "3": {"class_type": "VAELoader", "inputs": {"vae_name": "minimax_h3_video_vae_fp16.safetensors"}},
+        "4": {"class_type": "VAELoader", "inputs": {"vae_name": "minimax_h3_audio_vae_fp32.safetensors"}},
+        "5": {"class_type": "LoadImage", "inputs": {"image": image_name}},
+        "6": {"class_type": "LoadAudio", "inputs": {"audio": audio_name}},
+        "7": {"class_type": "MiniMaxH3ReferenceToVideo",
+              "inputs": {"clip": ["2", 0], "vae": ["3", 0], "audio_vae": ["4", 0],
+                         "prompt": motion_prompt, "width": width, "height": height,
+                         "length": frames, "ref_image_size": "match",
+                         "ref_images.ref_image_0": ["5", 0],
+                         "ref_audios.ref_audio_0": ["6", 0]}},
+        "8": {"class_type": "BasicScheduler",
+              "inputs": {"model": ["1", 0], "scheduler": "simple", "steps": 20, "denoise": 1.0}},
+        "9": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "res_multistep"}},
+        "10": {"class_type": "BasicGuider", "inputs": {"model": ["1", 0], "conditioning": ["7", 0]}},
+        "11": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}},
+        "12": {"class_type": "SamplerCustomAdvanced",
+               "inputs": {"noise": ["11", 0], "guider": ["10", 0], "sampler": ["9", 0],
+                          "sigmas": ["8", 0], "latent_image": ["7", 1]}},
+        "13": {"class_type": "VAEDecode", "inputs": {"samples": ["12", 0], "vae": ["3", 0]}},
+        "14": {"class_type": "VAEDecodeAudio", "inputs": {"samples": ["12", 0], "vae": ["4", 0]}},
+        "15": {"class_type": "CreateVideo", "inputs": {"images": ["13", 0], "fps": 24,
+                                                       "audio": ["14", 0], "bit_depth": 8}},
+        "16": {"class_type": "SaveVideo",
+               "inputs": {"video": ["15", 0], "filename_prefix": prefix,
+                          "format": "auto", "codec": "auto"}},
+    }
+
+
 def h3_i2v_workflow(image_name: str, motion_prompt: str, *, seed: int = 0,
                     frames: int = 120, width: int = 1344, height: int = 768,
                     prefix: str = "echoloom/h3i2v") -> dict:
