@@ -165,11 +165,11 @@ def test_full_gate_flow_and_compose(client):
     # 合成
     r = client.post(f"/api/projects/{pid}/compose", json={})
     assert r.status_code == 200
-    for _ in range(400):
+    for _ in range(1200):  # 满载环境下后台线程可能被拖慢，给足 120s
         st = client.get(f"/api/projects/{pid}").json()
         if st["final"]:
             break
-        time.sleep(0.05)
+        time.sleep(0.1)
     assert st["final"] == f"/files/{pid}/final/mv.mp4"
     assert st["status"] == "done"
 
