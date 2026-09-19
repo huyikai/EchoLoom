@@ -274,12 +274,12 @@ class Pipeline:
 
     # ---- 内部 -----------------------------------------------------------------
     def _landscape(self, src: Path, dest: Path) -> Path:
-        """任意比例图片 → 等比放大 + 居中裁切到目标横版分辨率。"""
+        """任意比例图片 → 等比放大 + 顶部偏置裁切（人像脸在上半部，居中裁会切头）。"""
         if dest.exists():
             return dest
         run([self.s.ffmpeg_bin, "-y", "-v", "error", "-i", str(src), "-frames:v", "1",
              "-vf", (f"scale={self.s.width}:{self.s.height}:force_original_aspect_ratio=increase,"
-                     f"crop={self.s.width}:{self.s.height}"), str(dest)])
+                     f"crop={self.s.width}:{self.s.height}:0:'(ih-oh)*0.12'"), str(dest)])
         return dest
 
     def _chosen_portrait(self, state: ProjectState, portraits_dir: Path) -> Path:
