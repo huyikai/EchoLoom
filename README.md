@@ -56,7 +56,7 @@ DEFAULT_SONG_SEC=180
 | 文生音乐 | MiniMax **Music3**（ComfyUI 原生节点） | INT8 三件套，实测 `max_duration` 上限 360s，默认 180s |
 | 文生图 | Z-Image Turbo | 8 步蒸馏，肖像 768×1024 / 分镜 1344×768 |
 | 图生视频 | MiniMax **H3** i2v | Turbo LoRA 6 步，~5s/镜头，24fps，帧数 5 的倍数 |
-| 对口型 | FaceFusion `lip_syncer` | wav2lip_gan_96，源音频 = Demucs 人声分轨 |
+| 对口型 | H3 Ref2VA 声画同步（主）/ FaceFusion lip_syncer（备） | r2v_locked 配方：锁定构图 prompt + `ref_image_size=max` + 44.1k 立体声切片，Mandarin 口型原生生成；wav2lip_gan_96 仅作快速备选（96px 贴回，中文口型贴合差）。edtalk_256 实测推理过慢弃用 |
 | 分轨 | Demucs | htdemucs，vocals / no_vocals |
 | 歌词时间戳 | Qwen3-ASR-1.7B + ForcedAligner-0.6B | 字级对齐，difflib 匹配 + 线性插值兜底 |
 | 母带 | ffmpeg loudnorm 两遍 | -14 LUFS / TP -1.5 / 48kHz |
@@ -97,7 +97,8 @@ docs/       prompt-formats.md（官方提示词规范）/ ui-iterations/
 
 - [ ] >3 分钟歌曲（Music3 AR 续写 `comfy/ldm/minimax_music/ar.py`）
 - [ ] 竖屏模板（抖音 9:16）
-- [ ] 歌手镜头备选路径：H3 Ref2VA 声画同步生成（studebaker-gospel 已验证）
+- [ ] 歌手镜头备选路径：~~H3 Ref2VA 声画同步生成~~（已落地为默认口型方案，见上表）
+- [ ] FaceFusion wav2lip 快速备选的质量增强（超分嘴部区域）
 - [ ] ACE-Step 备选音乐引擎（本机权重已就位）
 - [ ] SCAIL 舞蹈复刻镜头、声音克隆
 

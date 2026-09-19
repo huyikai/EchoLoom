@@ -112,6 +112,16 @@ def h3_r2v_workflow(image_name: str, audio_name: str, motion_prompt: str, *, see
     }
 
 
+def h3_r2v_workflow_locked(image_name: str, audio_name: str, motion_prompt: str, *, seed: int = 0,
+                           frames: int = 119, width: int = 1344, height: int = 768,
+                           prefix: str = "echoloom/h3r2v2") -> dict:
+    """锁定构图版：ref_image_size=max（studebaker 实测口型有效的配方）。"""
+    wf = h3_r2v_workflow(image_name, audio_name, motion_prompt, seed=seed, frames=frames,
+                         width=width, height=height, prefix=prefix)
+    wf["7"]["inputs"]["ref_image_size"] = "max"
+    return wf
+
+
 def h3_i2v_workflow(image_name: str, motion_prompt: str, *, seed: int = 0,
                     frames: int = 120, width: int = 1344, height: int = 768,
                     prefix: str = "echoloom/h3i2v") -> dict:

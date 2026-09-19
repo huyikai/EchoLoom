@@ -31,7 +31,7 @@ from echoloom.mv import (  # noqa: E402
     xfade_offsets,
 )
 from echoloom.state import ProjectState  # noqa: E402
-from echoloom.workflows import h3_r2v_workflow  # noqa: E402
+from echoloom.workflows import h3_r2v_workflow, h3_r2v_workflow_locked  # noqa: E402
 
 FPS = 24
 
@@ -90,22 +90,51 @@ def make_wav2lip(vocals: Path, shot_clip: Path, a0: float, a1: float, dest: Path
 
 
 def make_r2v(client: ComfyClient, portrait_land: Path, vocals: Path, dest: Path,
-             a0: float, a1: float, tmp: Path, seed: int, state_id: str) -> Path:
+             a0: float, a1: float, tmp: Path, seed: int, state_id: str,
+             *, locked: bool = False) -> Path:
+    """locked=True 用 studebaker 验证配方：参考图锁构图 + max 参考尺寸 + 44.1k 立体声。"""
     s = get_settings()
-    sl = vocals_slice(vocals, tmp / f"{dest.stem}_slice.wav", a0, a1)
+    if locked:
+        sl = tmp / f"{dest.stem}_slice.wav"
+        run([s.ffmpeg_bin, "-y", "-v", "error", "-i", str(vocals),
+             "-ss", f"{a0:.3f}", "-to", f"{a1:.3f}", "-ac", "2", "-ar", "44100", str(sl)])
+    else:
+        sl = vocals_slice(vocals, tmp / f"{dest.stem}_slice.wav", a0, a1)
     up_img = client.upload_image(portrait_land)
     up_aud = client.upload_image(sl)  # /upload/image 也接受音频文件
     dur = a1 - a0
     frames = max(17, round(dur * FPS))
     frames += 17 - frames % 17
-    wf = h3_r2v_workflow(
-        up_img, up_aud,
+    prompt = (
+        "The singer sings this exact audio passage, medium close-up with the same framing, "
+        "hairstyle and black leather jacket as the reference image, looking into camera. "
+        "Mouth movements precisely synchronized to the Mandarin song audio, expressive "
+        "emotional performance, subtle head nods on the beat, gentle natural gestures, "
+        "cinematic stage lighting, photorealistic."
+        if locked else
         "The singer sings this exact audio passage to camera with expressive mouth movements "
         "precisely synchronized to the Mandarin song audio, subtle gestures on the beat, "
-        "steady camera, cinematic stage lighting.",
-        seed=seed, frames=frames, prefix=f"echoloom/{state_id}/r2v")
+        "steady camera, cinematic stage lighting."
+    )
+    wf = h3_r2v_workflow_locked(
+        up_img, up_aud, prompt, seed=seed, frames=frames,
+        prefix=f"echoloom/{state_id}/r2v2") if locked else h3_r2v_workflow(
+        up_img, up_aud, prompt, seed=seed, frames=frames,
+        prefix=f"echoloom/{state_id}/r2v")
     outs = client.run(wf, poll=5.0, timeout=7200)
     return client.fetch(outs[0], dest)
+
+
+def kf_portrait(d: Path, portraits: Path, chosen: str, s) -> Path:
+    """顶部偏置横版裁切的参考图（脸在上半部，居中裁会切头）。"""
+    out = d / "shots" / "ref_land.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if not out.exists():
+        run([s.ffmpeg_bin, "-y", "-v", "error", "-i", str(portraits / chosen),
+             "-frames:v", "1",
+             "-vf", ("scale=1344:768:force_original_aspect_ratio=increase,"
+                     "crop=1344:768:0:'(ih-oh)*0.12'"), str(out)])
+    return out
 
 
 def main() -> int:
@@ -146,6 +175,33 @@ def main() -> int:
         print("A/B 报告 ->", d / "shots" / "ab" / "report.json")
         return 0
 
+    if mode == "ab2":
+        # 三方对比：wav2lip_v2(已有) vs edtalk_256 vs r2v_locked，同一歌手镜头
+        shot = int(sys.argv[3]) if len(sys.argv) > 3 else singer_idx[0]
+        i = shot - 1
+        client = ComfyClient(s.comfyui_url)
+        tmp = d / "shots" / "ab"
+        tmp.mkdir(parents=True, exist_ok=True)
+        a0, a1 = max(0.0, offsets[i] - 0.25), min(song_dur, offsets[i] + durs[i] + 0.25)
+        src = clips_dir / f"shot_{shot:02d}.mp4"
+        land = kf_portrait(d, portraits, chosen, s)
+        # edtalk_256（FaceFusion 内更好的口型模型）
+        sl = vocals_slice(stems, tmp / f"edtalk_{shot:02d}_slice.wav", a0, a1)
+        e = run_lip_sync(sl, src, tmp / f"shot_{shot:02d}_e.mp4", settings=s, model="edtalk_256")
+        print(f"[{shot}] edtalk done", flush=True)
+        # r2v locked
+        r = make_r2v(client, land, stems, tmp / f"shot_{shot:02d}_r2.mp4",
+                     a0, a1, tmp, state.seed + i * 31, pid, locked=True)
+        print(f"[{shot}] r2v_locked done", flush=True)
+        m_e = lipsync_metric(e, tmp / f"edtalk_{shot:02d}_slice.wav")
+        m_r = lipsync_metric(r, tmp / f"shot_{shot:02d}_r2_slice.wav")
+        print(f"shot#{shot}: edtalk={m_e:.3f} r2v_locked={m_r:.3f}", flush=True)
+        for v in (e, r):
+            subprocess.run([s.ffmpeg_bin, "-y", "-v", "error", "-i", str(v),
+                            "-vf", "select='not(mod(n\\,6))',scale=300:-1,tile=4x2",
+                            "-frames:v", "1", str(v.with_suffix(".png"))], check=True)
+        return 0
+
     if mode == "apply":
         method = sys.argv[3] if len(sys.argv) > 3 else "wav2lip"
         client = ComfyClient(s.comfyui_url)
@@ -158,12 +214,14 @@ def main() -> int:
             a0, a1 = max(0.0, offsets[i] - 0.25), min(song_dur, offsets[i] + durs[i] + 0.25)
             src = clips_dir / f"shot_{i + 1:02d}.mp4"
             dest = out_dir / f"shot_{i + 1:02d}.mp4"
+            if dest.exists():
+                print(f"[{n + 1}/{len(singer_idx)}] skip {dest.name} (exists)", flush=True)
+                continue
             t0 = time.time()
             if method == "r2v":
-                land = kf_dir / f"portrait_land_{i + 1:02d}.png"
-                if not land.exists():
-                    land = portrait
-                make_r2v(client, land, stems, dest, a0, a1, tmp, state.seed + i * 31, pid)
+                land = kf_portrait(d, portraits, chosen, s)
+                make_r2v(client, land, stems, dest, a0, a1, tmp, state.seed + i * 31, pid,
+                         locked=True)
             else:
                 make_wav2lip(stems, src, a0, a1, dest, tmp)
             print(f"[{n + 1}/{len(singer_idx)}] shot#{i + 1} {method} {time.time() - t0:.0f}s", flush=True)
