@@ -9,14 +9,13 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
-from .align import align_lines
-from .asr import transcribe_wav
-from .ass_style import AssStyle, build_ass
+from .ass_style import AssStyle
 from .audio import master_audio, separate_vocals
 from .comfy import ComfyClient, OutFile
 from .config import Settings
 from .llm import ZhipuClient
 from .mv import (
+    FfmpegError,
     burn_cmd,
     build_clip,
     has_nvenc,
@@ -237,20 +236,21 @@ class Pipeline:
             clips[i] = out
             self.progress("compose", f"对口型 {i + 1} 完成", 0.80)
 
-        # 6) ASS：ASR 字级时间戳 + 歌词对齐
-        self.progress("compose", "ASR 字级对齐…", 0.84)
-        asr = transcribe_wav(stems["vocals"], asr_dir=self.s.qwen3_asr_dir,
-                             aligner_dir=self.s.qwen3_aligner_dir,
-                             language=state.language,
-                             hotwords=lyrics.replace("\n", " ")[:400])
-        lines = [ln for ln in lyrics.replace("\r\n", "\n").split("\n") if ln.strip()
-                 and not ln.strip().startswith("[")]
-        timed = align_lines(lines, asr["words"], total_sec=song_dur)
+        # 6) ASS：歌词强制对齐（KTV 标准做法，无需 ASR 识别）+ 标题卡/前奏指示
+        self.progress("compose", "歌词字级强制对齐…", 0.84)
+        from .subtitles import build_project_ass, force_align_lyrics
+        timed = force_align_lyrics(stems["vocals"], lyrics,
+                                   asr_dir=self.s.qwen3_asr_dir,
+                                   aligner_dir=self.s.qwen3_aligner_dir,
+                                   language=state.language)
+        if not timed:
+            raise FfmpegError("歌词强制对齐失败：无任何时间戳")
         style = AssStyle(**(state.ass_style or {}))
         ass_path = self._dir(project_dir, "ass") / "final.ass"
         ass_path.write_text(
-            build_ass(style, timed, play_res_x=self.s.width, play_res_y=self.s.height,
-                      title=state.title), encoding="utf-8")
+            build_project_ass(style, timed, title=state.title,
+                              play_res_x=self.s.width, play_res_y=self.s.height),
+            encoding="utf-8")
         (self._dir(project_dir, "ass") / "timed.json").write_text(
             json.dumps(timed, ensure_ascii=False, indent=1), encoding="utf-8")
 
@@ -267,7 +267,7 @@ class Pipeline:
         self.progress("compose", "烧字幕合成成片…", 0.94)
         final = self._dir(project_dir, "final") / "mv.mp4"
         run(burn_cmd(self.s.ffmpeg_bin, body, master, final, ass_path=ass_path,
-                     title=state.title, total=song_dur, w=self.s.width, h=self.s.height,
+                     title=None, total=song_dur, w=self.s.width, h=self.s.height,
                      nvenc=self.nvenc))
         self.progress("compose", f"成片完成 {final}", 1.0)
         return final

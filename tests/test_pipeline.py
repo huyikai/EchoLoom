@@ -147,11 +147,20 @@ def env(tmp_path, monkeypatch):
         dest.write_bytes(b"master")
         return dest, {"input_i": -18.0, "input_tp": -2.0, "input_lra": 6.0, "input_thresh": -28.0}
 
-    def fake_asr(wav, **kw):
-        words = [{"word": w, "start": 30.0 + i * 0.4, "end": 30.3 + i * 0.4}
-                 for i, w in enumerate("夜色穿过旧街灯影子替我沉默让风把名字吹散")]
-        return {"engine": "fake", "language": "zh", "duration": 180.0,
-                "text": "".join(w["word"] for w in words), "words": words}
+    def fake_force_align(wav, lyrics, **kw):
+        import re as _re
+        lines = [ln for ln in lyrics.split("\n") if ln.strip() and not ln.strip().startswith("[")]
+        out = []
+        punct = _re.compile(r"[，。！？、；：\s,.!?;:()\"'\-—…·]")
+        for k, ln in enumerate(lines):
+            chars = [c for c in ln if not punct.match(c)]
+            base = 30.0 + k * 8.0
+            step = 0.4
+            timed = [{"ch": c, "start": round(base + j * step, 3),
+                      "end": round(base + (j + 1) * step, 3)} for j, c in enumerate(chars)]
+            out.append({"start": base, "end": base + len(chars) * step + 0.35,
+                        "text": ln, "chars": timed})
+        return out
 
     def fake_lipsync(audio, video, dest, **kw):
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -167,7 +176,8 @@ def env(tmp_path, monkeypatch):
                         lambda *a, **k: ["true", str(a[3])])  # a=(ff, video, audio, dest)
     monkeypatch.setattr(P, "separate_vocals", fake_stems)
     monkeypatch.setattr(P, "master_audio", fake_master)
-    monkeypatch.setattr(P, "transcribe_wav", fake_asr)
+    import echoloom.subtitles as SUB
+    monkeypatch.setattr(SUB, "force_align_lyrics", fake_force_align)
     import echoloom.lipsync as L
     monkeypatch.setattr(L, "run_lip_sync", fake_lipsync)
     # pipeline.compose_final 里是局部 import，直接改 pipeline 命名空间引用即可

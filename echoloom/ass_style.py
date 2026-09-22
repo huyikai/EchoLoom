@@ -77,9 +77,21 @@ def style_line(style: AssStyle) -> str:
     )
 
 
+def title_style_line(style: AssStyle) -> str:
+    """标题样式：主字体 1.35 倍、顶部居中、主色强调。"""
+    return (
+        f"Style: {STYLE_NAME}Title,{style.font_name},{int(style.font_size * 1.35)},"
+        f"{ass_color(style.primary)},{ass_color(style.secondary)},"
+        f"{ass_color(style.outline_color)},{ass_color('#000000', 0x80)},"
+        f"{style.bold:d},0,0,0,100,100,0,0,1,{style.outline + 1:g},{style.shadow + 1:g},"
+        f"8,{style.margin_l},{style.margin_r},90,1"
+    )
+
+
 def build_ass(style: AssStyle, timed_lines: list[dict[str, Any]], *,
-              play_res_x: int = 1344, play_res_y: int = 768, title: str = "EchoLoom") -> str:
-    """timed_lines: [{start, end, chars: [{ch, start, end}] | None, text}]"""
+              play_res_x: int = 1344, play_res_y: int = 768, title: str = "EchoLoom",
+              extra_events: list[dict[str, Any]] | None = None) -> str:
+    """timed_lines: [{start, end, chars, text}]；extra_events: [{start,end,text,style,fade_ms}]。"""
     header = (
         "[Script Info]\n"
         f"Title: {title}\n"
@@ -92,11 +104,18 @@ def build_ass(style: AssStyle, timed_lines: list[dict[str, Any]], *,
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"{style_line(style)}\n\n"
+        f"{style_line(style)}\n"
+        f"{title_style_line(style)}\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
     events: list[str] = []
+    for ev in extra_events or []:
+        fade = rf"{{\fad({ev.get('fade_ms', 400)},{ev.get('fade_ms', 400)})}}"
+        events.append(
+            f"Dialogue: 1,{ass_time(ev['start'])},{ass_time(ev['end'])},"
+            f"{ev.get('style', STYLE_NAME)},,0,0,0,,{fade}{ev['text']}"
+        )
     for line in timed_lines:
         text = _karaoke_text(style, line)
         fade = ""
