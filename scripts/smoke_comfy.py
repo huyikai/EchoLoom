@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """M1 冒烟：python scripts/smoke_comfy.py <t2i|music|i2v> [args...]
 
-t2i   一张 Z-Image 测试图（~30s）
+t2i   一张 Qwen-Image 2.1 测试图（~30-90s）
 music 一段 Music3 冒烟曲（默认 30s，~1-3min）
 i2v   一段 H3 图生视频（需要先 t2i，~2-4min）
 """
@@ -18,7 +18,7 @@ from echoloom.workflows import (  # noqa: E402
     frames_for,
     h3_i2v_workflow,
     music3_workflow,
-    zimage_workflow,
+    qwen_image_workflow,
 )
 
 OUT = ROOT / "output" / "smoke"
@@ -33,7 +33,7 @@ def main() -> int:
     t0 = time.time()
 
     if stage == "t2i":
-        wf = zimage_workflow(
+        wf = qwen_image_workflow(
             "cinematic portrait of a young woman standing in a sunlit courtyard, "
             "soft natural light, film photography, shallow depth of field, 85mm lens",
             width=768, height=1024, seed=42, prefix="echoloom_smoke/t2i",

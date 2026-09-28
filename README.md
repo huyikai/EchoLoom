@@ -3,10 +3,10 @@
 **开源本地 AI MV 流水线** —— 一句话主题，在你的显卡上织出一支完整 MV：
 
 ```mermaid
-主题 ─▶ ①歌词(智谱GLM) ─▶ ②分镜脚本 ─▶ ③歌手肖像(Z-Image) ─▶ ④整曲(MiniMax Music3)
+主题 ─▶ ①歌词(智谱GLM) ─▶ ②分镜脚本 ─▶ ③歌手肖像(Qwen-Image 2.1) ─▶ ④整曲(MiniMax Music3)
                      └─────────── 全部确认 ───────────┘
                                   ▼
-   分镜图(Z-Image) → 图生视频(MiniMax H3) → 对口型(FaceFusion) → 分轨(Demucs)
+   分镜图(Qwen-Image 2.1) → 图生视频(MiniMax H3) → 对口型(FaceFusion) → 分轨(Demucs)
    → 母带(loudnorm) → karaoke 字幕(Qwen3-ASR 字级对齐 + ASS) → 合成烧字(ffmpeg) → mv.mp4
 ```
 
@@ -54,7 +54,7 @@ DEFAULT_SONG_SEC=180
 |---|---|---|
 | 写词/分镜/caption | 智谱 GLM | `glm-4.6`，输出严格遵循 [官方提示词格式](docs/prompt-formats.md) |
 | 文生音乐 | MiniMax **Music3**（ComfyUI 原生节点） | INT8 三件套，实测 `max_duration` 上限 360s，默认 180s |
-| 文生图 | Z-Image Turbo | 8 步蒸馏，肖像 768×1024 / 分镜 1344×768 |
+| 文生图 | Qwen-Image 2.1 | int8 主模型 + qwen3vl_8b 编码 + 2.1 VAE，官方 t2i 模板 API 图（25 步/euler/simple），原生 2K |
 | 图生视频 | MiniMax **H3** i2v | Turbo LoRA 6 步，~5s/镜头，24fps，帧数 5 的倍数 |
 | 对口型 | H3 Ref2VA 声画同步（主）/ FaceFusion lip_syncer（备） | r2v_locked 配方：锁定构图 prompt + `ref_image_size=max` + 44.1k 立体声切片，Mandarin 口型原生生成；wav2lip_gan_96 仅作快速备选（96px 贴回，中文口型贴合差）。edtalk_256 实测推理过慢弃用 |
 | 分轨 | Demucs | htdemucs，vocals / no_vocals |
@@ -105,7 +105,7 @@ docs/       prompt-formats.md（官方提示词规范）/ ui-iterations/
 ## 致谢
 
 [ComfyUI](https://github.com/comfyanonymous/ComfyUI) · [MiniMax H3/Music3 开放权重](https://huggingface.co/Comfy-Org) ·
-[Z-Image](https://huggingface.co/Tongyi-MAI) · [FaceFusion](https://github.com/facefusion/facefusion) ·
+[Qwen-Image 2.1](https://huggingface.co/Comfy-Org/Qwen-Image-2.1) · [FaceFusion](https://github.com/facefusion/facefusion) ·
 [Demucs](https://github.com/adefossez/demucs) · [Qwen3-ASR](https://huggingface.co/Qwen) ·
 [智谱开放平台](https://open.bigmodel.cn)。ASR 推理实现参考了本机
 video-remake-studio 项目的工程实践（transformers 5.x + numpy 传参）。

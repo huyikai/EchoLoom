@@ -32,7 +32,7 @@ from .prompts import (
     validate_storyboard,
 )
 from .state import ProjectState, ProjectStatus
-from .workflows import frames_for, h3_i2v_workflow, music3_workflow, zimage_workflow
+from .workflows import frames_for, h3_i2v_workflow, music3_workflow, qwen_image_workflow
 
 Progress = Callable[[str, str, float], None]
 
@@ -114,7 +114,7 @@ class Pipeline:
         n = self.s.portrait_candidates
         files: list[str] = []
         for i in range(n):
-            wf = zimage_workflow(
+            wf = qwen_image_workflow(
                 f"character sheet, {desc}, upper body portrait, looking at camera, "
                 "clean dark background, cinematic studio lighting, highly detailed",
                 width=768, height=1024, seed=state.seed + i * 101,
@@ -170,7 +170,7 @@ class Pipeline:
         padded = [d + xfade_t for d in durs[:-1]] + [durs[-1]]  # xfade 补偿后的素材时长
         self.progress("compose", f"时间轴: {len(shots)} 镜 × 缩放 {scale:.3f} = {song_dur:.1f}s", 0.34)
 
-        # 2) 关键帧：scene 用 Z-Image，singer 用已选肖像（裁成横版避免 H3 压扁）
+        # 2) 关键帧：scene 用 Qwen-Image 2.1，singer 用已选肖像（裁成横版避免 H3 压扁）
         kf_dir = self._dir(project_dir, "shots", "keyframes")
         portraits = self._dir(project_dir, "portraits")
         chosen_portrait = self._chosen_portrait(state, portraits)
@@ -183,7 +183,7 @@ class Pipeline:
                 f"{shot['prompt']}. Consistent character: {sb['singer_desc']}. "
                 "Cinematic film still, no text, no watermark."
             )
-            wf = zimage_workflow(prompt, width=self.s.width, height=self.s.height,
+            wf = qwen_image_workflow(prompt, width=self.s.width, height=self.s.height,
                                  seed=state.seed + i * 7,
                                  prefix=f"echoloom/{state.id}/kf")
             outs = self.comfy.run(wf, poll=2.0, timeout=900)

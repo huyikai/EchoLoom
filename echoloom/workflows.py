@@ -2,7 +2,7 @@
 
 三份 ground truth 来源（本机已跑通）：
 - music3:  D:/develop/baoshu-gospel/wf_music3.json（180s 成曲）
-- z_image: D:/develop/comfyui/workflows/z_image_turbo_8step_api.json
+- qwen_image: 官方模板 image_qwen_image_2_1_t2i.json 的最小 API 图
 - h3_i2v:  D:/develop/studebaker-gospel/gen_i2v.py（4 段动态镜头）
 """
 from __future__ import annotations
@@ -44,27 +44,35 @@ def music3_workflow(caption: str, lyrics: str, *, seed: int = 0, max_duration: f
     }
 
 
-def zimage_workflow(prompt: str, *, negative: str = "", width: int = 1344, height: int = 768,
-                    seed: int = 42, steps: int = 8, shift: float = 3.0,
-                    prefix: str = "echoloom/zimage") -> dict:
+def qwen_image_workflow(prompt: str, *, negative: str = "", width: int = 1344, height: int = 768,
+                        seed: int = 42, steps: int = 25, resolution: int = 1024,
+                        prefix: str = "echoloom/qwen_image") -> dict:
+    """Qwen-Image 2.1 文生图（官方 image_qwen_image_2_1_t2i 模板的最小 API 图）。
+
+    TextEncodeQwenImage21 输出 [positive, negative, latent]；采样 25 步 cfg=1 euler/simple。
+    """
     return {
-        "3": {"class_type": "KSampler",
-              "inputs": {"seed": seed, "steps": steps, "cfg": 1.0, "sampler_name": "euler",
-                         "scheduler": "simple", "denoise": 1.0,
-                         "model": ["66", 0], "positive": ["6", 0], "negative": ["7", 0],
-                         "latent_image": ["58", 0]}},
-        "6": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["38", 0]}},
-        "7": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["38", 0]}},
-        "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0], "vae": ["39", 0]}},
-        "37": {"class_type": "UNETLoader",
-               "inputs": {"unet_name": "z_image_turbo_bf16.safetensors", "weight_dtype": "default"}},
-        "38": {"class_type": "CLIPLoader",
-               "inputs": {"clip_name": "qwen_3_4b.safetensors", "type": "qwen_image", "device": "cpu"}},
-        "39": {"class_type": "VAELoader", "inputs": {"vae_name": "z_image_turbo_ae.safetensors"}},
-        "58": {"class_type": "EmptySD3LatentImage",
-               "inputs": {"width": width, "height": height, "batch_size": 1}},
-        "60": {"class_type": "SaveImage", "inputs": {"filename_prefix": prefix, "images": ["8", 0]}},
-        "66": {"class_type": "ModelSamplingAuraFlow", "inputs": {"shift": shift, "model": ["37", 0]}},
+        "1": {"class_type": "UNETLoader",
+              "inputs": {"unet_name": "qwen_image_2.1_int8_convrot.safetensors",
+                         "weight_dtype": "default"}},
+        "2": {"class_type": "QwenImage21Cache",
+              "inputs": {"model": ["1", 0], "device": "auto", "dtype": "default"}},
+        "3": {"class_type": "CLIPLoader",
+              "inputs": {"clip_name": "qwen3vl_8b_int8_convrot.safetensors",
+                         "type": "qwen_image", "device": "default"}},
+        "4": {"class_type": "TextEncodeQwenImage21",
+              "inputs": {"clip": ["3", 0], "prompt": prompt, "negative_prompt": negative,
+                         "resolution": resolution}},
+        "5": {"class_type": "EmptyLatentImage",
+              "inputs": {"width": width, "height": height, "batch_size": 1}},
+        "6": {"class_type": "KSampler",
+              "inputs": {"model": ["2", 0], "positive": ["4", 0], "negative": ["4", 1],
+                         "latent_image": ["5", 0], "seed": seed, "steps": steps, "cfg": 1.0,
+                         "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0}},
+        "7": {"class_type": "VAELoader",
+              "inputs": {"vae_name": "qwen_image_2.1_vae_bf16.safetensors"}},
+        "8": {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["7", 0]}},
+        "9": {"class_type": "SaveImage", "inputs": {"filename_prefix": prefix, "images": ["8", 0]}},
     }
 
 

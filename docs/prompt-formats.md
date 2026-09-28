@@ -95,13 +95,15 @@ no over-compression, preserve live dynamics, 48kHz hi-fi fidelity>
 5. 加速：`MiniMaxH3TurboLoRA(strength=1.0, low_vram=True)` + `BasicScheduler(simple, steps=6)` +
    `MiniMaxH3TurboSampler`（4~6 步快速出片）。
 
-## 三、Z-Image Turbo — 文生图提示词
+## 三、Qwen-Image 2.1 — 文生图提示词
 
 - 正向：英文，电影感摄影描述（主体+场景+光线+镜头+质感），歌手肖像要含
-  `character sheet`/多角度描述；负向可空串。
-- 参数：`KSampler(steps=8, cfg=1.0, euler/simple, denoise=1.0)` + `ModelSamplingAuraFlow(shift=3.0)`；
-  CLIP `qwen_3_4b.safetensors (type=qwen_image, device=cpu)`；latent `EmptySD3LatentImage`。
+  `character sheet`/多角度描述；负向可空串（节点接受 negative_prompt，cfg=1 时影响甚微）。
+- 参数：`KSampler(steps=25, cfg=1.0, euler/simple, denoise=1.0)`；编码走
+  `TextEncodeQwenImage21(clip=qwen3vl_8b, resolution=1024)` 输出 positive/negative；
+  `QwenImage21Cache(device=auto)` 包裹 UNet 加速；VAE `qwen_image_2.1_vae_bf16`。
 - 分辨率：肖像 768×1024 竖版；分镜 1344×768 横版（与 H3 输出一致，避免二次缩放）。
+  原生支持 2K（2048×2048）直接出图。
 
 ## 四、FaceFusion 对口型输入
 

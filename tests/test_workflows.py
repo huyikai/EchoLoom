@@ -1,6 +1,13 @@
+import json
+
 import pytest
 
-from echoloom.workflows import frames_for, h3_i2v_workflow, music3_workflow, zimage_workflow
+from echoloom.workflows import (  # noqa: F401
+    frames_for,
+    h3_i2v_workflow,
+    music3_workflow,
+    qwen_image_workflow,
+)
 
 
 def test_frames_for_multiple_of_five():
@@ -26,14 +33,25 @@ def test_music3_graph_matches_ground_truth():
     assert wf["9"]["inputs"]["format"] == "flac"
 
 
-def test_zimage_graph():
-    wf = zimage_workflow("a singer portrait", width=768, height=1024, seed=42)
-    assert wf["37"]["inputs"]["unet_name"] == "z_image_turbo_bf16.safetensors"
-    assert wf["38"]["inputs"] ["type"] == "qwen_image"
-    assert wf["66"]["inputs"]["shift"] == 3.0
-    assert wf["3"]["inputs"]["steps"] == 8 and wf["3"]["inputs"]["cfg"] == 1.0
-    assert wf["58"]["inputs"]["width"] == 768
-    assert wf["60"]["inputs"]["filename_prefix"].startswith("echoloom/")
+def test_qwen_image_graph_matches_template():
+    wf = qwen_image_workflow("a singer portrait", width=768, height=1024, seed=42)
+    assert wf["1"]["inputs"]["unet_name"] == "qwen_image_2.1_int8_convrot.safetensors"
+    assert wf["2"]["class_type"] == "QwenImage21Cache"
+    assert wf["3"]["inputs"] ["type"] == "qwen_image"
+    assert wf["3"]["inputs"]["clip_name"] == "qwen3vl_8b_int8_convrot.safetensors"
+    assert wf["4"]["class_type"] == "TextEncodeQwenImage21"
+    assert wf["4"]["inputs"]["negative_prompt"] == ""
+    # TextEncodeQwenImage21 输出 [positive, negative, latent] → KSampler 正负条件
+    assert wf["6"]["inputs"]["positive"] == ["4", 0]
+    assert wf["6"]["inputs"]["negative"] == ["4", 1]
+    assert wf["6"]["inputs"]["steps"] == 25 and wf["6"]["inputs"]["cfg"] == 1.0
+    assert wf["6"]["inputs"]["sampler_name"] == "euler" and wf["6"]["inputs"]["scheduler"] == "simple"
+    assert wf["7"]["inputs"]["vae_name"] == "qwen_image_2.1_vae_bf16.safetensors"
+    assert wf["5"]["inputs"]["width"] == 768
+    assert wf["9"]["inputs"]["filename_prefix"].startswith("echoloom/")
+    # 不再引用任何 Z-Image 权重
+    blob = json.dumps(wf)
+    assert "z_image" not in blob and "AuraFlow" not in blob
 
 
 def test_h3_i2v_graph():
